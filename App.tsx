@@ -1,118 +1,151 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
+  Alert,
+  FlatList,
+  Pressable,
   StyleSheet,
   Text,
-  useColorScheme,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import React, {useEffect, useState} from 'react';
+import styles from './Source/style';
+import database from '@react-native-firebase/database';
+import Icons from 'react-native-vector-icons/FontAwesome';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const App = () => {
+  const [task, setTask] = useState('');
+  const [list, setList] = useState('');
+  const [isUpdateData, setIsUpdateData] = useState(false);
+  const [selectedDataIndex, setSelectedDataIndex] = useState(null);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  useEffect(() => {
+    getDatabase();
+  }, []);
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const handleInputData = async () => {
+    const index = list.length;
+    try {
+      if (task) {
+        const response = await database()
+          .ref(`todo/${index}`)
+          .set({value: task});
+        setTask('');
+      } else {
+        Alert.alert('Please enter Data');
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  const handleUpdateData = async () => {
+    try {
+      if (task) {
+        const response = await database()
+          .ref(`todo/${selectedDataIndex}`)
+          .update({
+            value: task,
+          });
+        setIsUpdateData(false);
+        setTask('');
+      } else {
+        Alert.alert('Please enter Data');
+      }
+    } catch (error) {}
+  };
+  const handleEdit = (taskIndex, indexValue) => {
+    setIsUpdateData(true);
+    setSelectedDataIndex(taskIndex);
+    setTask(indexValue);
+  };
+  const handleDelete = (taskIndex, indexValue) => {
+    Alert.alert('Delete', `Are you sure to delete "${indexValue}" ?`, [
+      {
+        text: 'Cancel',
+      },
+      {
+        text: 'OK',
+        onPress: async () => {
+          try {
+            const response = await database().ref(`todo/${taskIndex}`).remove();
+            setIsUpdateData(false);
+            setTask('');
+          } catch (error) {
+            console.error(error);
+          }
+        },
+      },
+    ]);
+  };
+  const getDatabase = async () => {
+    try {
+      const data = await database()
+        .ref('todo')
+        .on('value', tempData => {
+          setList(tempData.val());
+        });
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
+    <View style={styles.container}>
+      <View>
+        <Text style={styles.headerText}>TODO App</Text>
+      </View>
+      <TextInput
+        style={styles.inputText}
+        placeholder="Enter any task"
+        value={task}
+        onChangeText={text => setTask(text)}
+      />
+      {!isUpdateData ? (
+        <Pressable onPress={() => handleInputData()}>
+          <Text style={styles.addButton}>Add</Text>
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => handleUpdateData()}>
+          <Text style={styles.addButton}>Update</Text>
+        </Pressable>
+      )}
+
+      <View
+        style={{backgroundColor: '#fdf0d5', borderRadius: 5, marginBottom: 20}}>
+        <Text
+          style={{
+            fontSize: 25,
+            color: '#003049',
+            textAlign: 'center',
+            fontWeight: 'bold',
+          }}>
+          Todo List
+        </Text>
+      </View>
+      <FlatList
+        data={list}
+        renderItem={item => {
+          const taskIndex = item.index;
+          if (item.item !== null) {
+            return (
+              <View style={styles.cardContainer}>
+                <Text style={styles.card}>{item.item.value}</Text>
+                <View style={styles.btnGrp}>
+                  <TouchableOpacity
+                    onPress={() => handleEdit(taskIndex, item.item.value)}>
+                    <Icons name="edit" size={30} color={'black'} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDelete(taskIndex, item.item.value)}>
+                    <Icons name="trash-o" size={30} color={'black'} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }
+        }}
+      />
     </View>
   );
-}
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
 export default App;
